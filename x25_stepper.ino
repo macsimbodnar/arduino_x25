@@ -27,6 +27,8 @@
 #define MOTOR_PIN3      6
 #define MOTOR_PIN4      7
 
+#define RESERV_LED_PIN  8
+
 #define SENSOR_PIN      A0
 #define AVERAGE_FACTOR  0         // коэффициент сглаживания показаний (0 = не сглаживать)
 
@@ -43,6 +45,9 @@
 #define MOTOR_HALF_PERCENT_TH   165
 #define SENSOR_HALF             ((SENSOR_MAX - SENSOR_ZERO) / 2)
 
+#define IN_RESERVE_TH   34        // More or less position 45 on the motor
+
+
 /**
    GLOBALS
 */
@@ -51,7 +56,7 @@ SwitecX25 motor(STEPS, MOTOR_PIN1, MOTOR_PIN2, MOTOR_PIN3, MOTOR_PIN4);
 unsigned long last_check  = 0;
 int motor_position        = 0;
 int last_sensor_val       = 0;
-
+int led_status            = LOW;
 
 /**
    SETUP
@@ -61,7 +66,9 @@ void setup(void)
 #ifdef LOGS
   Serial.begin(9600);
 #endif
-
+  digitalWrite(RESERV_LED_PIN, led_status);
+  pinMode(RESERV_LED_PIN, OUTPUT);
+  
   // Run the motor against the stops
   motor.zero();
   // Set the motor to the defined zero
@@ -97,6 +104,8 @@ void loop(void)
       // Update only if the values differs
       if (abs(val - last_sensor_val) > AVERAGE_FACTOR) {
         last_sensor_val = val;
+
+        check_if_reserve(last_sensor_val);
 
         // Using different mapping if the sensor is under or above the 50%
         if (last_sensor_val > SENSOR_HALF) {
@@ -135,4 +144,22 @@ void loop(void)
 
   // the motor only moves when you call update
   motor.update();
+}
+
+
+void check_if_reserve(int sensor_val) {
+  int new_led_status;
+  if (sensor_val > IN_RESERVE_TH) {
+    // OK
+    new_led_status = HIGH;
+  } else {
+    // In reserve, turn on LED
+    new_led_status = LOW;
+  }
+
+  // Change the led status only if differrent from the previous check
+  if (new_led_status != led_status) {
+    led_status = new_led_status;
+    digitalWrite(RESERV_LED_PIN, led_status);
+  }
 }
